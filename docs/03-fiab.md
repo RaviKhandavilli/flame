@@ -109,35 +109,98 @@ sudo groupadd docker
 sudo usermod -aG docker $USER && newgrp docker 
 ```
 
+### EC2 instance
+For Amazon linux, no VM hypervisor is needed. The following tools are sufficient: `minikube`, `kubectl`, `helm`, `cri-dockerd`, `crictl` , `docker` and `jq`.
+The fiab env was tested under amzn2 in a x86 machine.
 
-## Starting minikube
-Run the following command to start minikube.
-```bash
-minikube start
+#### step 1: Install docker
+Install docker as per [this](https://docs.docker.com/engine/install/) document
+
+
+#### step 2: Install Docker CRI
+To install cri-dockerd
+1. Download cri-dockerd source code
+``` bash
+sudo -i 
+git clone https://github.com/Mirantis/cri-dockerd.git 
 ```
-The default resource allocation is 2 CPU, 4GB memory and 20GB disk.
-In order to change these parameters, use `--cpus`, `--memory` and `--disk-size` respectively.
-For example, 
-```bash
-minikube start --cpus 4 --memory 4096m --disk-size 100gb
+
+2. Install Golang compiler
 ```
-When `docker` driver is in use, run ```minikube config set driver docker``` to make docker driver default. These changes will take effect upon a minikube delete and then a minikube start.
+wget https://storage.googleapis.com/golang/getgo/installer_linux 
+chmod +x ./installer_linux 
+./installer_linux 
+source ~/.bash_profile 
+ ```
 
-We recommend a disk space of 100GB to allow sufficient disk space to store the flame container images and other images in the minikube VM.
-
-Next, `ingress` and `ingress` addons need to be installed with the following command:
-```bash
-minikube addons enable ingress
-minikube addons enable ingress-dns
+ 3. Install and start cri-dockerd
+ ```
+cd cri-dockerd 
+mkdir bin 
+go build -o bin/cri-dockerd 
+install -o root -g root -m 0755 bin/cri-dockerd /usr/bin/cri-dockerd 
+cp -a packaging/systemd/* /etc/systemd/system 
+systemctl daemon-reload 
+systemctl enable cri-docker.service 
+systemctl enable --now cri-docker.socket 
+exit
 ```
-When `hyperkit` driver is in use, enabling `ingress` addon may fail due to the same issue shown in [here](#fixing-docker-build-error),
-which explains a workaround. Once the workload is applied, come back here and rerun these commands.
 
+#### step 3:Install crictl
+1. Download crictl tar file and install
+```
+VERSION="v1.25.0" 
+wget https://github.com/kubernetes-sigs/cri-tools/releases/download/$VERSION/crictl-$VERSION-linux-amd64.tar.gz 
+sudo tar zxvf crictl-$VERSION-linux-amd64.tar.gz -C /usr/local/bin 
+rm -f crictl-$VERSION-linux-amd64.tar.gz 
+```
 
-As a final step, a cert manager is needed to enable tls. The `setup-cert-manager.sh` script installs and configures a cert manager for
-selfsigned certificate creation. Run the following command:
-```bash
-./setup-cert-manager.sh
+#### step 4: Installing minikube
+1. Install minukube
+
+```
+curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-latest.x86_64.rpm 
+sudo rpm -Uvh minikube-latest.x86_64.rpm 
+```
+
+Note: If `Exiting due to HOST_JUJU_LOCK_PERMISSION` error happens run below command:
+
+```
+sudo sysctl fs.protected_regular=0 
+```
+
+2. Start Minikube
+```
+sudo minikube start --driver=none --apiserver-ips 127.0.0.1 --apiserver-name localhost --cni=bridge
+```
+
+#### step 5: Install kubectl
+1. Run below commands to install kubectl command
+```
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" 
+sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl 
+```
+
+#### step 6 (Optional): Install NVIDIA'S device plugin
+1. If there are NVIDIA's GPU's available in the machine, inorder to enable them deploy below yml
+```
+sudo kubectl create -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/master/nvidia-device-plugin.yml 
+```
+2. To check if GPUs are enabled run below command
+```
+sudo kubectl get nodes -ojson | jq .items[].status.capacity 
+```
+Output should look similar to:
+```
+{ 
+  "cpu": "4", 
+  "ephemeral-storage": "524275692Ki", 
+  "hugepages-1Gi": "0", 
+  "hugepages-2Mi": "0", 
+  "memory": "62766704Ki", 
+  "nvidia.com/gpu": "1", 
+  "pods": "110" 
+} 
 ```
 
 ## Building flame
