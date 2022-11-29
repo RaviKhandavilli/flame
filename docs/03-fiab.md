@@ -62,10 +62,10 @@ brew install --cask robo-3t
 For linux, no VM hypervisor is needed. The following tools are sufficient: `minikube`, `kubectl`, `helm`, `docker` and `jq`.
 The fiab env was tested under Archlinux in a x86 machine.
 
-#### step 1: Installing minikube
+#### Step 1: Installing minikube
 We install the latest minikube stable release on x86-64 Linux using binary downloaded from [here](https://minikube.sigs.k8s.io/docs/start/).
 
-#### step 2: Installing kubectl, helm and jq
+#### Step 2: Installing kubectl, helm and jq
 To install [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/#install-using-other-package-management).
 ```bash
 sudo snap install kubectl --classic
@@ -80,7 +80,7 @@ To install jq.
 sudo apt update
 sudo apt install -y jq
 ```
-#### step3: Install docker
+#### Step3: Install docker
 1. Update the apt package index and install packages to allow apt to use a repository over HTTPS.                                                                       
 ```bash
 sudo apt-get update
@@ -109,32 +109,33 @@ sudo groupadd docker
 sudo usermod -aG docker $USER && newgrp docker 
 ```
 
-### EC2 instance
-For Amazon linux, no VM hypervisor is needed. The following tools are sufficient: `minikube`, `kubectl`, `helm`, `cri-dockerd`, `crictl` , `docker` and `jq`.
-The fiab env was tested under amzn2 in a x86 machine.
+### AWS EC2 instance with Amazon Linux 2 image and GPU
+This section is specifically for AWS EC2 instance with GPU. For general linux machines without GPU (regardless of VM or baremetal machine),
+the guideline for [linux](#linux) is recommended.
+For Amazon linux 2 image (amzn2), the following tools are necessary: `minikube`, `kubectl`, `helm`, `cri-dockerd`, `crictl` , `docker` and `jq`.
+The image was tested under an ec2 instance with GPU (e.g., p2 instances). The following procedures show how to enable GPU support in minikube:
 
-#### step 1: Install docker
-Install docker as per [this](https://docs.docker.com/engine/install/) document
+#### Step 1: Install docker
+Install docker as per [this](https://docs.docker.com/engine/install/) document.
 
+#### Step 2: Install Docker CRI
 
-#### step 2: Install Docker CRI
-To install cri-dockerd
-1. Download cri-dockerd source code
-``` bash
-sudo -i 
-git clone https://github.com/Mirantis/cri-dockerd.git 
-```
-
-2. Install Golang compiler
-```
+1. Install Golang and set up the compilation env.
+```bash
 wget https://storage.googleapis.com/golang/getgo/installer_linux 
 chmod +x ./installer_linux 
 ./installer_linux 
 source ~/.bash_profile 
  ```
 
- 3. Install and start cri-dockerd
- ```
+2. Download cri-dockerd source code.
+``` bash
+sudo -i 
+git clone https://github.com/Mirantis/cri-dockerd.git 
+```
+
+3. Install and set up cri-dockerd via systemd.
+ ```bash
 cd cri-dockerd 
 mkdir bin 
 go build -o bin/cri-dockerd 
@@ -146,8 +147,8 @@ systemctl enable --now cri-docker.socket
 exit
 ```
 
-#### step 3:Install crictl
-1. Download crictl tar file and install
+#### Step 3:Install crictl
+Download crictl tar file and install it.
 ```
 VERSION="v1.25.0" 
 wget https://github.com/kubernetes-sigs/cri-tools/releases/download/$VERSION/crictl-$VERSION-linux-amd64.tar.gz 
@@ -155,42 +156,43 @@ sudo tar zxvf crictl-$VERSION-linux-amd64.tar.gz -C /usr/local/bin
 rm -f crictl-$VERSION-linux-amd64.tar.gz 
 ```
 
-#### step 4: Installing minikube
-1. Install minukube
-
-```
+#### Step 4: Install minikube
+1. Install minukube.
+```bash
 curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-latest.x86_64.rpm 
 sudo rpm -Uvh minikube-latest.x86_64.rpm 
 ```
 
-Note: If `Exiting due to HOST_JUJU_LOCK_PERMISSION` error happens run below command:
-
-```
-sudo sysctl fs.protected_regular=0 
-```
-
-2. Start Minikube
-```
+2. Start minikube.
+```bash
 sudo minikube start --driver=none --apiserver-ips 127.0.0.1 --apiserver-name localhost --cni=bridge
 ```
 
-#### step 5: Install kubectl
-1. Run below commands to install kubectl command
+Note: If `Exiting due to HOST_JUJU_LOCK_PERMISSION` error happens, run the following command:
+
+```bash
+sudo sysctl fs.protected_regular=0 
 ```
+
+#### Step 5: Install kubectl
+Run the following commands to install kubectl command:
+```bash
 curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" 
 sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl 
 ```
 
-#### step 6 (Optional): Install NVIDIA'S device plugin
-1. If there are NVIDIA's GPU's available in the machine, inorder to enable them deploy below yml
-```
+#### Step 6: Install NVIDIA'S device plugin
+1. If NVIDIA's GPU is available in the machine, run the following command to install nvidia device plugin:
+```bash
 sudo kubectl create -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/master/nvidia-device-plugin.yml 
 ```
-2. To check if GPUs are enabled run below command
-```
+
+2. To check if GPUs are enabled, run the following command:
+```bash
 sudo kubectl get nodes -ojson | jq .items[].status.capacity 
 ```
-Output should look similar to:
+
+An output should look similar to:
 ```
 { 
   "cpu": "4", 
